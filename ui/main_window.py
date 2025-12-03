@@ -228,8 +228,8 @@ class MainWindow:
         self.video_label.configure(image=photo, text="")
         self.video_label.image = photo  # Mantém referência
         
-        # Agenda próxima atualização
-        self.root.after(33, self._update_video_display)  # ~30 FPS
+        # REMOVIDO: self.root.after(33, self._update_video_display)
+        # O callback do módulo de reconhecimento chamará este método quando houver novo frame
     
     def _on_access_event(self, event_data: dict):
         """Callback quando há um evento de acesso"""
