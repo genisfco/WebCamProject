@@ -104,12 +104,20 @@ class TrainingModule:
         
         # Treina Fisherfaces
         try:
-            print('Treinando reconhecedor Fisherface...')
-            fisher_classifier = cv2.face.FisherFaceRecognizer_create()
-            fisher_classifier.train(faces, ids)
-            fisher_classifier.write('fisher_classifier.yml')
-            results['fisherfaces'] = True
-            print('... Concluído!\n')
+            # Fisherface requer pelo menos 2 classes (pessoas diferentes)
+            num_pessoas = len(face_names)
+            if num_pessoas < 2:
+                print('Treinando reconhecedor Fisherface...')
+                print(f'⚠ Aviso: Fisherface requer pelo menos 2 pessoas cadastradas.')
+                print(f'⚠ Atualmente há apenas {num_pessoas} pessoa(s). Pulando treinamento do Fisherface.\n')
+                results['fisherfaces'] = False
+            else:
+                print('Treinando reconhecedor Fisherface...')
+                fisher_classifier = cv2.face.FisherFaceRecognizer_create()
+                fisher_classifier.train(faces, ids)
+                fisher_classifier.write('fisher_classifier.yml')
+                results['fisherfaces'] = True
+                print('... Concluído!\n')
         except Exception as e:
             print(f'Erro ao treinar Fisherface: {e}\n')
             results['fisherfaces'] = False
