@@ -61,7 +61,7 @@ class FaceRecognitionModule:
         
         # Controle de rate limiting para evitar spam de notificações
         self.last_recognition_time = {}
-        self.recognition_cooldown = 2.0  # segundos entre reconhecimentos do mesmo usuário
+        self.recognition_cooldown = 5.0  # segundos entre reconhecimentos do mesmo usuário
     
     def _load_recognizer(self, option: str):
         """Carrega o reconhecedor facial"""

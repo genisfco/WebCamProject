@@ -197,13 +197,19 @@ class HistoricoWindow:
                 confianca_str = f"{registro['confianca']:.2f}" if registro['confianca'] else "N/A"
                 motivo = registro['motivo_negacao'] or ""
                 
+                # Obtém nome - verifica se existe no registro (vem do JOIN)
+                nome = registro.get('nome') or "Não identificado"
+                
                 # Formata identificação
-                tipo_id = registro.get('tipo_identificacao', '')
-                num_id = registro.get('numero_identificacao', registro.get('ra', 'N/A'))
-                if tipo_id and num_id != 'N/A':
+                tipo_id = registro.get('tipo_identificacao') or ''
+                num_id = registro.get('numero_identificacao') or ''
+                
+                if tipo_id and num_id:
                     identificacao = f"{tipo_id}: {num_id}"
-                else:
+                elif num_id:
                     identificacao = num_id
+                else:
+                    identificacao = "N/A"
                 
                 # Cor baseada no status
                 tag = "liberado" if registro['status'] == 'liberado' else "negado"
@@ -214,7 +220,7 @@ class HistoricoWindow:
                     values=(
                         registro['id'],
                         registro['data_hora'],
-                        registro['nome'] or "Não identificado",
+                        nome,
                         identificacao,
                         registro['tipo_evento'],
                         registro['status'].upper(),
@@ -294,11 +300,16 @@ class HistoricoWindow:
                 
                 # Dados
                 for registro in historico:
+                    nome = registro.get('nome') or "Não identificado"
+                    tipo_id = registro.get('tipo_identificacao') or ''
+                    num_id = registro.get('numero_identificacao') or ''
+                    identificacao = f"{tipo_id}: {num_id}" if tipo_id and num_id else (num_id or "N/A")
+                    
                     writer.writerow([
                         registro['id'],
                         registro['data_hora'],
-                        registro['nome'] or "Não identificado",
-                        registro['ra'] or "N/A",
+                        nome,
+                        identificacao,
                         registro['tipo_evento'],
                         registro['status'],
                         registro['confianca'] or "",
