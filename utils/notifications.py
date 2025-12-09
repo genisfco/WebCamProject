@@ -34,7 +34,7 @@ class NotificationManager:
         
         # Controle de notificação visual ativa
         self.active_notification: Optional[dict] = None
-        self.notification_duration = 3.0  # 3 segundos
+        self.notification_duration = 5.0  # 5 segundos
     
     def _init_tts(self):
         """Inicializa o motor de síntese de voz"""
@@ -230,7 +230,7 @@ class NotificationManager:
         
         self._log(mensagem)
         
-        # Define notificação visual ativa (será desenhada por 3 segundos)
+        # Define notificação visual ativa (será desenhada por 5 segundos)
         self._set_active_notification(nome_usuario, "LIBERADO", (0, 255, 0))
         
         # Voz ao invés de beep
@@ -253,7 +253,7 @@ class NotificationManager:
         
         self._log(mensagem)
         
-        # Define notificação visual ativa (será desenhada por 3 segundos)
+        # Define notificação visual ativa (será desenhada por 5 segundos)
         self._set_active_notification(display_name, "NEGADO", (0, 0, 255))
         
         # Voz ao invés de beep
@@ -314,10 +314,20 @@ class NotificationManager:
         mensagem = "⚠ NENHUM USUÁRIO CADASTRADO"
         self._log(mensagem)
         
-        # Define notificação visual ativa (será desenhada por 3 segundos)
+        # Define notificação visual ativa (será desenhada por 5 segundos)
         # Usa nome vazio e status completo - cada palavra será exibida em uma linha
         self._set_active_notification("", "NENHUM USUARIO CADASTRADO", (0, 165, 255))
         
         # Voz
         self._speak("NENHUM USUÁRIO CADASTRADO")
-
+    
+    def usuario_desconhecido(self):
+        """
+        Notifica que foi detectado um rosto, mas o usuário não foi reconhecido
+        """
+        mensagem = "⚠ USUÁRIO DESCONHECIDO"
+        self._log(mensagem)
+        
+        # Define notificação visual ativa (será desenhada por 5 segundos)
+        # Usa nome vazio e status completo - cada palavra será exibida em uma linha
+        self._set_active_notification("", "USUARIO DESCONHECIDO", (0, 165, 255))

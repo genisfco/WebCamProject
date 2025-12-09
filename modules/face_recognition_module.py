@@ -61,7 +61,11 @@ class FaceRecognitionModule:
         
         # Controle de rate limiting para evitar spam de notificações
         self.last_recognition_time = {}
-        self.recognition_cooldown = 5.0  # segundos entre reconhecimentos do mesmo usuário
+        self.recognition_cooldown = 10.0  # segundos entre reconhecimentos do mesmo usuário
+        
+        # Histórico de reconhecimentos recentes (para evitar alternância)
+        self.recent_recognitions = {}  # {nome_face: timestamp}
+        self.recent_recognition_window = 2.0  # segundos para considerar reconhecimento recente
     
     def _load_recognizer(self, option: str):
         """Carrega o reconhecedor facial"""
@@ -165,6 +169,14 @@ class FaceRecognitionModule:
                     break  # Apenas uma notificação por frame
             return processed_frame
         
+        # Limpa reconhecimentos antigos do histórico
+        current_time = time.time()
+        self.recent_recognitions = {
+            nome: timestamp 
+            for nome, timestamp in self.recent_recognitions.items()
+            if current_time - timestamp < self.recent_recognition_window
+        }
+        
         for i in range(0, detections.shape[2]):
             confidence_detection = detections[0, 0, i, 2]
             
@@ -186,15 +198,32 @@ class FaceRecognitionModule:
                 try:
                     prediction, conf = self.face_classifier.predict(face_roi)
                     
-                    # Processa reconhecimento
-                    if conf <= self.threshold and prediction in self.face_names:
+                    # Verifica se há reconhecimento recente do mesmo usuário
+                    has_recent_recognition = False
+                    if prediction in self.face_names:
                         nome_face = self.face_names[prediction]
+                        if nome_face in self.recent_recognitions:
+                            has_recent_recognition = True
+                    
+                    # Processa reconhecimento se:
+                    # 1. Confiança está dentro do threshold E prediction existe, OU
+                    # 2. Há reconhecimento recente do mesmo usuário (mesmo que conf > threshold)
+                    if (conf <= self.threshold and prediction in self.face_names) or \
+                       (has_recent_recognition and prediction in self.face_names):
+                        nome_face = self.face_names[prediction]
+                        # Atualiza histórico de reconhecimentos recentes
+                        self.recent_recognitions[nome_face] = current_time
                         self._process_recognition(nome_face, conf, prediction, 
                                                 start_x, start_y, end_x, end_y, processed_frame)
-                    # Face não identificada - não desenha nada, apenas processa silenciosamente
+                    else:
+                        # Face detectada mas não reconhecida
+                        # Só trata como desconhecido se não houver nenhum reconhecimento recente
+                        if not self.recent_recognitions:
+                            self._process_unknown_face(start_x, start_y, end_x, end_y, conf)
                 except Exception as e:
-                    # Erro ao reconhecer (classificador vazio ou corrompido) - não desenha nada
-                    pass
+                    # Erro ao reconhecer (classificador vazio ou corrompido) - nega acesso
+                    if not self.recent_recognitions:
+                        self._process_unknown_face(start_x, start_y, end_x, end_y, None)
         
         if not face_detected:
             # Nenhuma face detectada
@@ -270,6 +299,44 @@ class FaceRecognitionModule:
                     'confianca': conf,
                     'motivo': motivo
                 })
+    
+    def _process_unknown_face(self, start_x: int, start_y: int, end_x: int, end_y: int, conf: Optional[float]):
+        """
+        Processa uma face detectada mas não reconhecida
+        
+        Args:
+            start_x, start_y, end_x, end_y: Coordenadas do bounding box
+            conf: Nível de confiança (None se houve erro)
+        """
+        # Rate limiting - evita spam de notificações
+        current_time = time.time()
+        if 'desconhecido' in self.last_recognition_time:
+            if current_time - self.last_recognition_time['desconhecido'] < self.recognition_cooldown:
+                return
+        
+        self.last_recognition_time['desconhecido'] = current_time
+        
+        # Notifica acesso negado para usuário desconhecido
+        self.notification_manager.usuario_desconhecido()
+        self.db_manager.registrar_acesso(
+            None, 
+            "entrada", 
+            "negado", 
+            conf if conf is not None else 0.0, 
+            "Usuário não reconhecido"
+        )
+        
+        # Callback de acesso negado
+        if self.access_callback:
+            self.access_callback({
+                'usuario_id': None,
+                'nome': 'Desconhecido',
+                'numero_identificacao': '',
+                'tipo_identificacao': '',
+                'status': 'negado',
+                'confianca': conf if conf is not None else 0.0,
+                'motivo': 'Usuário não reconhecido'
+            })
     
     def _video_loop(self):
         """Loop principal de processamento de vídeo (executa em thread separada)"""

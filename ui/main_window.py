@@ -184,7 +184,7 @@ class MainWindow:
             self.recognition_module = FaceRecognitionModule(
                 self.db_manager,
                 recognizer_type="lbph",
-                threshold=10e5,
+                threshold=100,  # 10e5 = 1000000  (a large number so it will always return a prediction)
                 max_width=640
             )
             
