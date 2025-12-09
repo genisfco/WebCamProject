@@ -11,7 +11,8 @@
 7. [Banco de Dados](#banco-de-dados)
 8. [Módulos Principais](#módulos-principais)
 9. [Algoritmos de Reconhecimento](#algoritmos-de-reconhecimento)
-10. [Fluxo de Funcionamento](#fluxo-de-funcionamento)
+10. [Sistema de Notificações](#sistema-de-notificações)
+11. [Fluxo de Funcionamento](#fluxo-de-funcionamento)
 
 ---
 
@@ -83,10 +84,24 @@ Este projeto foi desenvolvido como trabalho final da disciplina de **Aprendizage
 - Mensagens personalizadas de negação
 
 ### 6. **Notificações**
-- Notificações visuais na interface
-- Alertas sonoros (Windows)
-- Log de eventos em tempo real
-- Indicadores visuais (LED verde/vermelho)
+- **Notificações Visuais**:
+  - Quadro retangular grande exibido na tela durante reconhecimento
+  - Formato vertical (altura maior que largura) para melhor visibilidade
+  - Quadro verde com nome do usuário e "LIBERADO" para acesso permitido
+  - Quadro vermelho com nome do usuário e "NEGADO" para acesso negado
+  - Exibição automática por 3 segundos após reconhecimento
+  - Centralizado na tela com fundo semi-transparente
+  - Textos em fonte grande e legível
+- **Notificações de Voz**:
+  - Síntese de voz usando bibliotecas nativas do Windows (win32com) ou pyttsx3
+  - Anuncia "ACESSO LIBERADO" quando acesso é permitido
+  - Anuncia "ACESSO NEGADO" quando acesso é negado
+  - Execução em thread separada para não bloquear o processamento
+  - Configurável (velocidade e volume)
+- **Outras Notificações**:
+  - Log de eventos em tempo real na interface
+  - Indicadores visuais (LED verde/vermelho) na janela principal
+  - Mensagens detalhadas com informações de confiança e motivos
 
 ---
 
@@ -110,9 +125,11 @@ Este projeto foi desenvolvido como trabalho final da disciplina de **Aprendizage
 
 ### Utilitários
 - **Pickle**: Serialização de objetos Python (mapeamento de nomes)
-- **Threading**: Processamento assíncrono de vídeo
+- **Threading**: Processamento assíncrono de vídeo e síntese de voz
 - **datetime**: Manipulação de datas e horários
-- **winsound**: Notificações sonoras (Windows)
+- **winsound**: Notificações sonoras básicas (Windows)
+- **pyttsx3**: Biblioteca de síntese de voz multiplataforma (opcional)
+- **win32com.client**: API nativa do Windows para síntese de voz (SAPI.SpVoice)
 
 ### Arquivos de Modelos
 - **deploy.prototxt.txt**: Arquitetura da rede SSD para detecção facial
@@ -338,13 +355,38 @@ Verifica permissões de acesso dos usuários.
 
 ### 6. `NotificationManager` (`utils/notifications.py`)
 
-Gerencia notificações visuais e sonoras.
+Gerencia notificações visuais e sonoras do sistema.
 
 **Funcionalidades:**
-- Notificações de acesso liberado/negado
-- Alertas sonoros (Windows)
-- Log de eventos
-- Callbacks para interface
+
+**Notificações Visuais:**
+- Quadro de notificação grande exibido sobre o vídeo
+- Formato retangular vertical (50% largura, 75% altura do frame)
+- Cores diferenciadas: verde para acesso liberado, vermelho para negado
+- Exibição automática por 3 segundos após reconhecimento
+- Controle de tempo usando timestamps para garantir duração exata
+- Desenho sobre o frame usando OpenCV com transparência
+
+**Síntese de Voz:**
+- Suporte a múltiplas bibliotecas (win32com.client ou pyttsx3)
+- Inicialização automática da melhor biblioteca disponível
+- Execução em thread separada para não bloquear processamento
+- Configuração de velocidade (150) e volume (0.8)
+- Textos personalizáveis: "ACESSO LIBERADO" e "ACESSO NEGADO"
+
+**Outras Funcionalidades:**
+- Log de eventos com callbacks para interface
+- Notificações informativas e de aviso
+- Tratamento robusto de erros (sistema funciona mesmo sem voz)
+
+**Principais métodos:**
+- `acesso_liberado()`: Notifica acesso liberado (visual + voz)
+- `acesso_negado()`: Notifica acesso negado (visual + voz)
+- `draw_active_notification()`: Desenha notificação ativa no frame
+- `_draw_notification_box()`: Desenha o quadro visual
+- `_speak()`: Reproduz texto usando síntese de voz
+- `_set_active_notification()`: Define notificação visual ativa
+- `set_log_callback()`: Define callback para logs
 
 ---
 
@@ -373,6 +415,118 @@ Gerencia notificações visuais e sonoras.
   - Bom para reconhecimento em tempo real
 - **Desvantagens**: Pode ser mais lento que Eigenfaces
 - **Uso**: **Algoritmo padrão** do sistema, recomendado para vídeo
+
+---
+
+## 🔊 Sistema de Notificações
+
+O sistema implementa um conjunto completo de notificações visuais e sonoras para fornecer feedback imediato sobre o resultado do reconhecimento facial.
+
+### Notificações Visuais
+
+#### Quadro de Notificação
+
+Quando um usuário é reconhecido e o acesso é liberado ou negado, um quadro grande é exibido sobre o vídeo da câmera:
+
+**Características:**
+- **Formato**: Retangular vertical (portrait)
+  - Largura: 50% da largura do frame
+  - Altura: 75% da altura do frame
+  - Centralizado na tela
+- **Cores**:
+  - Verde (RGB: 0, 255, 0) para acesso liberado
+  - Vermelho (RGB: 0, 0, 255) para acesso negado
+- **Conteúdo**:
+  - Nome do usuário em maiúsculas (fonte 1.0)
+  - Status ("LIBERADO" ou "NEGADO") em fonte maior (1.3)
+  - Textos centralizados e em branco para contraste
+- **Duração**: Exatamente 3 segundos após o reconhecimento
+- **Efeito Visual**:
+  - Fundo semi-transparente (60% opacidade)
+  - Borda espessa (4 pixels) na cor do status
+  - Sobreposição sobre o vídeo sem bloquear completamente a visualização
+
+#### Implementação Técnica
+
+O sistema utiliza um mecanismo de controle de tempo baseado em timestamps:
+
+1. Quando ocorre um reconhecimento, uma notificação é ativada com timestamp atual
+2. A cada frame processado, verifica-se se ainda está dentro dos 3 segundos
+3. Se sim, o quadro é desenhado sobre o frame usando OpenCV
+4. Após 3 segundos, a notificação é automaticamente removida
+
+**Métodos principais:**
+- `_set_active_notification()`: Define notificação ativa com timestamp
+- `draw_active_notification()`: Verifica tempo e desenha se necessário
+- `_draw_notification_box()`: Desenha o quadro visual no frame
+
+### Notificações de Voz
+
+O sistema utiliza síntese de voz (Text-to-Speech) para anunciar verbalmente o resultado do reconhecimento.
+
+#### Bibliotecas Suportadas
+
+O sistema tenta usar bibliotecas na seguinte ordem de prioridade:
+
+1. **win32com.client** (Windows nativo)
+   - Usa a API SAPI (Speech API) do Windows
+   - Não requer instalação adicional
+   - Disponível apenas no Windows
+
+2. **pyttsx3** (multiplataforma)
+   - Biblioteca Python multiplataforma
+   - Requer instalação: `pip install pyttsx3`
+   - Funciona em Windows, Linux e macOS
+
+#### Funcionalidades
+
+- **Textos anunciados**:
+  - "ACESSO LIBERADO" quando acesso é permitido
+  - "ACESSO NEGADO" quando acesso é negado
+- **Configurações**:
+  - Velocidade: 150 palavras por minuto
+  - Volume: 80% do máximo
+- **Execução**:
+  - Processamento em thread separada (não bloqueia o sistema)
+  - Thread daemon para não impedir encerramento do programa
+  - Tratamento de erros silencioso (sistema continua funcionando sem voz)
+
+#### Personalização
+
+Os textos de voz podem ser facilmente modificados no arquivo `utils/notifications.py`:
+
+```python
+# Linha 211 - Acesso liberado
+self._speak("ACESSO LIBERADO")  # Pode ser alterado para qualquer texto
+
+# Linha 234 - Acesso negado
+self._speak("ACESSO NEGADO")  # Pode ser alterado para qualquer texto
+```
+
+### Integração com o Sistema
+
+As notificações são integradas ao fluxo de reconhecimento:
+
+1. **Reconhecimento bem-sucedido**:
+   - Usuário identificado no banco de dados
+   - Permissões verificadas
+   - Notificação visual ativada (quadro verde/vermelho)
+   - Notificação de voz reproduzida
+   - Log registrado na interface
+
+2. **Rate Limiting**:
+   - Sistema evita spam de notificações
+   - Cooldown de 5 segundos entre reconhecimentos do mesmo usuário
+   - Durante cooldown, apenas desenha moldura no rosto sem notificações
+
+### Outras Notificações
+
+Além das notificações principais, o sistema também possui:
+
+- **LED de Status**: Indicador visual na janela principal (verde/vermelho/cinza)
+- **Log de Eventos**: Registro textual completo de todas as ações
+- **Mensagens Informativas**: Notificações sobre estado do sistema
+- **Alertas de Erro**: Mensagens quando ocorrem problemas
 
 ---
 
@@ -410,7 +564,12 @@ Gerencia notificações visuais e sonoras.
       - Verifica permissões
       - Registra acesso no histórico
       - Exibe resultado na interface
-      - Emite notificação
+      - Emite notificação visual (quadro verde/vermelho por 3 segundos)
+      - Emite notificação de voz ("ACESSO LIBERADO" ou "ACESSO NEGADO")
+   d. A cada frame processado:
+      - Verifica se há notificação visual ativa
+      - Se ainda dentro dos 3 segundos, desenha o quadro no frame
+      - Se tempo expirado, remove a notificação
 ```
 
 ### Treinamento dos Classificadores
@@ -447,7 +606,8 @@ Gerencia notificações visuais e sonoras.
 - Requer boa iluminação para melhor precisão
 - Funciona melhor com faces frontais
 - Requer pelo menos 10-30 imagens por pessoa para treinamento eficaz
-- Sistema desenvolvido para Windows (notificações sonoras)
+- Sistema desenvolvido para Windows (notificações sonoras e síntese de voz)
+- Síntese de voz requer biblioteca pyttsx3 instalada (ou win32com nativo do Windows)
 
 ### Segurança
 
@@ -495,6 +655,7 @@ Este projeto foi desenvolvido como trabalho acadêmico para a disciplina de Apre
 
 ---
 
-**Versão da Documentação**: 1.0  
-**Data**: 2024
+**Versão da Documentação**: 1.1  
+**Data**: 2024  
+**Última Atualização**: Sistema de Notificações Visuais e de Voz
 

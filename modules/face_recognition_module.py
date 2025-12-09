@@ -128,6 +128,10 @@ class FaceRecognitionModule:
             Frame processado com anotações
         """
         processed_frame = frame.copy()
+        
+        # Desenha notificação visual ativa se houver
+        self.notification_manager.draw_active_notification(processed_frame)
+        
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         (h, w) = frame.shape[:2]
         
@@ -262,6 +266,7 @@ class FaceRecognitionModule:
                       (start_x, start_y - 10),
                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             
+            # Define notificação visual (será desenhada por 3 segundos)
             self.notification_manager.acesso_liberado(usuario['nome'], conf)
             self.db_manager.registrar_acesso(usuario_id, "entrada", "liberado", conf)
             
@@ -282,6 +287,7 @@ class FaceRecognitionModule:
                       (start_x, start_y - 10),
                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
             
+            # Define notificação visual (será desenhada por 3 segundos)
             self.notification_manager.acesso_negado(motivo, usuario['nome'])
             self.db_manager.registrar_acesso(usuario_id, "entrada", "negado", conf, motivo)
             
