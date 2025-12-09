@@ -80,7 +80,7 @@ class NotificationManager:
         Args:
             frame: Frame do OpenCV para desenhar
             nome_usuario: Nome do usuário
-            status: Status ("LIBERADO" ou "NEGADO")
+            status: Status ("LIBERADO" ou "NEGADO") ou texto com múltiplas linhas
             color: Cor do quadro (B, G, R)
         """
         if frame is None:
@@ -108,33 +108,59 @@ class NotificationManager:
                      (box_x + box_width, box_y + box_height), 
                      color, 4)
         
-        # Texto do nome do usuário
-        nome_font_scale = 1
-        nome_thickness = 3
-        nome_text = nome_usuario.upper()
-        (nome_text_width, nome_text_height), _ = cv2.getTextSize(
-            nome_text, cv2.FONT_HERSHEY_SIMPLEX, nome_font_scale, nome_thickness
-        )
-        nome_x = box_x + (box_width - nome_text_width) // 2
-        nome_y = box_y + box_height // 2 - 30
+        # Texto do nome do usuário (só desenha se não estiver vazio)
+        if nome_usuario:
+            nome_font_scale = 1
+            nome_thickness = 3
+            nome_text = nome_usuario.upper()
+            (nome_text_width, nome_text_height), _ = cv2.getTextSize(
+                nome_text, cv2.FONT_HERSHEY_SIMPLEX, nome_font_scale, nome_thickness
+            )
+            nome_x = box_x + (box_width - nome_text_width) // 2
+            nome_y = box_y + box_height // 2 - 30
+            
+            cv2.putText(frame, nome_text, (nome_x, nome_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, nome_font_scale, 
+                       (255, 255, 255), nome_thickness, cv2.LINE_AA)
         
-        cv2.putText(frame, nome_text, (nome_x, nome_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, nome_font_scale, 
-                   (255, 255, 255), nome_thickness, cv2.LINE_AA)
-        
-        # Texto do status
+        # Texto do status - suporta múltiplas linhas
         status_font_scale = 1.3
         status_thickness = 5
-        status_text = status
-        (status_text_width, status_text_height), _ = cv2.getTextSize(
-            status_text, cv2.FONT_HERSHEY_SIMPLEX, status_font_scale, status_thickness
-        )
-        status_x = box_x + (box_width - status_text_width) // 2
-        status_y = box_y + box_height // 2 + 50
         
-        cv2.putText(frame, status_text, (status_x, status_y),
-                   cv2.FONT_HERSHEY_SIMPLEX, status_font_scale, 
-                   (255, 255, 255), status_thickness, cv2.LINE_AA)
+        # Divide o status em linhas (por espaços)
+        status_lines = status.split()
+        
+        # Calcula altura total do texto para centralizar
+        line_height = 0
+        max_line_width = 0
+        for line in status_lines:
+            (line_width, line_height_temp), _ = cv2.getTextSize(
+                line, cv2.FONT_HERSHEY_SIMPLEX, status_font_scale, status_thickness
+            )
+            line_height = line_height_temp
+            max_line_width = max(max_line_width, line_width)
+        
+        # Calcula posição inicial (centralizada verticalmente)
+        total_text_height = line_height * len(status_lines) + 20 * (len(status_lines) - 1)  # Espaçamento entre linhas
+        start_y_offset = total_text_height // 2
+        
+        # Ajusta posição vertical: se não tem nome, centraliza mais
+        if nome_usuario:
+            base_y = box_y + box_height // 2 + 50
+        else:
+            base_y = box_y + box_height // 2
+        
+        # Desenha cada linha do status
+        for i, line in enumerate(status_lines):
+            (line_width, _), _ = cv2.getTextSize(
+                line, cv2.FONT_HERSHEY_SIMPLEX, status_font_scale, status_thickness
+            )
+            line_x = box_x + (box_width - line_width) // 2
+            line_y = base_y - start_y_offset + i * (line_height + 20)
+            
+            cv2.putText(frame, line, (line_x, line_y),
+                       cv2.FONT_HERSHEY_SIMPLEX, status_font_scale, 
+                       (255, 255, 255), status_thickness, cv2.LINE_AA)
     
     def draw_active_notification(self, frame: np.ndarray):
         """
@@ -280,4 +306,18 @@ class NotificationManager:
             mensagem: Mensagem de aviso
         """
         self._log(f"⚠ AVISO: {mensagem}")
+    
+    def nenhum_usuario_cadastrado(self):
+        """
+        Notifica que nenhum usuário está cadastrado no sistema
+        """
+        mensagem = "⚠ NENHUM USUÁRIO CADASTRADO"
+        self._log(mensagem)
+        
+        # Define notificação visual ativa (será desenhada por 3 segundos)
+        # Usa nome vazio e status completo - cada palavra será exibida em uma linha
+        self._set_active_notification("", "NENHUM USUARIO CADASTRADO", (0, 165, 255))
+        
+        # Voz
+        self._speak("NENHUM USUÁRIO CADASTRADO")
 

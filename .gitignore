@@ -35,14 +35,13 @@ venv.bak/
 *~
 .DS_Store
 
-# Banco de dados (opcional - descomente se não quiser versionar)
-# database/*.db
-# database/*.db-journal
+# Banco de dados
+database/*.db
+database/*.db-journal
 
 # Arquivos de classificadores treinados (podem ser grandes)
-# Descomente se não quiser versionar os classificadores treinados
-# *.yml
-# face_names.pickle
+*.yml
+face_names.pickle
 
 # Datasets de imagens (podem ser muito grandes)
 # Não versionar as imagens capturadas

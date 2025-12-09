@@ -154,17 +154,15 @@ class FaceRecognitionModule:
                 confidence_detection = detections[0, 0, i, 2]
                 
                 if confidence_detection > 0.7:
-                    bbox = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
-                    (start_x, start_y, end_x, end_y) = bbox.astype("int")
+                    # Rate limiting para notificação
+                    current_time = time.time()
+                    if 'nenhum_usuario' not in self.last_recognition_time:
+                        self.last_recognition_time['nenhum_usuario'] = 0
                     
-                    if (start_x < 0 or start_y < 0 or end_x > w or end_y > h):
-                        continue
-                    
-                    cv2.rectangle(processed_frame, (start_x, start_y), 
-                                (end_x, end_y), (0, 165, 255), 2)
-                    cv2.putText(processed_frame, "Nenhum usuario cadastrado", 
-                              (start_x, start_y - 10),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+                    if current_time - self.last_recognition_time['nenhum_usuario'] >= self.recognition_cooldown:
+                        self.notification_manager.nenhum_usuario_cadastrado()
+                        self.last_recognition_time['nenhum_usuario'] = current_time
+                    break  # Apenas uma notificação por frame
             return processed_frame
         
         for i in range(0, detections.shape[2]):
@@ -193,20 +191,10 @@ class FaceRecognitionModule:
                         nome_face = self.face_names[prediction]
                         self._process_recognition(nome_face, conf, prediction, 
                                                 start_x, start_y, end_x, end_y, processed_frame)
-                    else:
-                        # Face não identificada
-                        cv2.rectangle(processed_frame, (start_x, start_y), 
-                                    (end_x, end_y), (0, 0, 255), 2)
-                        cv2.putText(processed_frame, "Nao identificado", 
-                                  (start_x, start_y - 10),
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                    # Face não identificada - não desenha nada, apenas processa silenciosamente
                 except Exception as e:
-                    # Erro ao reconhecer (classificador vazio ou corrompido)
-                    cv2.rectangle(processed_frame, (start_x, start_y), 
-                                (end_x, end_y), (0, 165, 255), 2)
-                    cv2.putText(processed_frame, "Erro ao reconhecer", 
-                              (start_x, start_y - 10),
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
+                    # Erro ao reconhecer (classificador vazio ou corrompido) - não desenha nada
+                    pass
         
         if not face_detected:
             # Nenhuma face detectada
@@ -231,11 +219,7 @@ class FaceRecognitionModule:
         current_time = time.time()
         if nome_face in self.last_recognition_time:
             if current_time - self.last_recognition_time[nome_face] < self.recognition_cooldown:
-                # Ainda em cooldown, apenas desenha no frame
-                cv2.rectangle(frame, (start_x, start_y), (end_x, end_y), (0, 255, 0), 2)
-                cv2.putText(frame, f"{nome_face} ({conf:.2f})", 
-                          (start_x, start_y - 10),
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                # Ainda em cooldown, não faz nada (não desenha nada)
                 return
         
         self.last_recognition_time[nome_face] = current_time
@@ -245,10 +229,6 @@ class FaceRecognitionModule:
         
         if not usuario:
             # Face reconhecida mas não cadastrada no banco
-            cv2.rectangle(frame, (start_x, start_y), (end_x, end_y), (0, 165, 255), 2)
-            cv2.putText(frame, f"{nome_face} (Nao cadastrado)", 
-                      (start_x, start_y - 10),
-                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 165, 255), 2)
             self.notification_manager.acesso_negado("Usuário não cadastrado no sistema", nome_face)
             self.db_manager.registrar_acesso(None, "entrada", "negado", conf, 
                                             "Usuário não cadastrado no sistema")
@@ -260,13 +240,7 @@ class FaceRecognitionModule:
         permitido, motivo = self.permission_checker.verificar_acesso(usuario_id)
         
         if permitido:
-            # Acesso liberado
-            cv2.rectangle(frame, (start_x, start_y), (end_x, end_y), (0, 255, 0), 2)
-            cv2.putText(frame, f"{usuario['nome']} - LIBERADO", 
-                      (start_x, start_y - 10),
-                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            
-            # Define notificação visual (será desenhada por 3 segundos)
+            # Acesso liberado - apenas notificação visual, sem desenhar ao redor do rosto
             self.notification_manager.acesso_liberado(usuario['nome'], conf)
             self.db_manager.registrar_acesso(usuario_id, "entrada", "liberado", conf)
             
@@ -281,13 +255,7 @@ class FaceRecognitionModule:
                     'confianca': conf
                 })
         else:
-            # Acesso negado
-            cv2.rectangle(frame, (start_x, start_y), (end_x, end_y), (0, 0, 255), 2)
-            cv2.putText(frame, f"{usuario['nome']} - NEGADO", 
-                      (start_x, start_y - 10),
-                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-            
-            # Define notificação visual (será desenhada por 3 segundos)
+            # Acesso negado - apenas notificação visual, sem desenhar ao redor do rosto
             self.notification_manager.acesso_negado(motivo, usuario['nome'])
             self.db_manager.registrar_acesso(usuario_id, "entrada", "negado", conf, motivo)
             
