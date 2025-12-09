@@ -101,7 +101,7 @@ class NotificationManager:
         cv2.rectangle(overlay, (box_x, box_y), 
                      (box_x + box_width, box_y + box_height), 
                      color, -1)  # Preenchido
-        cv2.addWeighted(overlay, 0.6, frame, 0.4, 0, frame)
+        cv2.addWeighted(overlay, 0.9, frame, 0.1, 0, frame)
         
         # Desenha borda do quadro
         cv2.rectangle(frame, (box_x, box_y), 
